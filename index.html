@@ -211,11 +211,11 @@
     const now = performance.now();
     const dt = Math.max(now - lastT, 1);
 
-    rotY += dx * SENSITIVITY;
-    rotX -= dy * SENSITIVITY;
+    rotY -= dx * SENSITIVITY;
+    rotX += dy * SENSITIVITY;
 
-    velY = (dx * SENSITIVITY) * (16 / dt);
-    velX = -(dy * SENSITIVITY) * (16 / dt);
+    velY = -(dx * SENSITIVITY) * (16 / dt);
+    velX = (dy * SENSITIVITY) * (16 / dt);
 
     lastX = p.x;
     lastY = p.y;
