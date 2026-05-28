@@ -339,7 +339,7 @@
         const qctx = qrCanvas.getContext('2d');
         qctx.fillStyle = '#1a1a1a';
         qctx.fillRect(0, 0, 240, 240);
-        const innerSize = 147;
+        const innerSize = 100;
         const innerOffset = (240 - innerSize) / 2;
         const innerCell = innerSize / (moduleCount + margin * 2);
 
@@ -474,8 +474,8 @@
 
   // QRっぽいランダムドット模様（同じシードで再現できるよう簡易PRNG）
   function generateNoiseQRLike(seed) {
-    // QR面のカモフラージュノイズと同じセルサイズで揃える
-    const size = 47;
+    // QR面のカモフラージュノイズと同じセルサイズで揃える（cell ≈ 3.4px）
+    const size = 70;
     const px = 240;
     const cell = px / size;
     const c = document.createElement('canvas');
