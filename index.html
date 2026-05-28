@@ -73,29 +73,15 @@
     box-shadow: none;
     padding: 0;
   }
-  body.phase2 .face.front  { background-image: none; }
+  body.phase2 .face.front  { background-image: var(--qr-image); }
   body.phase2 .face.back   { background-image: var(--noise-image-1); }
   body.phase2 .face.right  { background-image: var(--noise-image-2); }
   body.phase2 .face.left   { background-image: var(--noise-image-3); }
   body.phase2 .face.top    { background-image: var(--noise-image-4); }
   body.phase2 .face.bottom { background-image: var(--noise-image-5); }
 
-  /* アナモルフィック歪みレイヤー：scaleX(2)で水平方向に伸ばす
-     → cubeをY軸まわりに約60度回すと画面上で正方形に見える */
-  .qr-layer {
-    display: none;
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-  }
-  body.phase2 .face.front .qr-layer {
-    display: block;
-    background-image: var(--qr-image);
-    background-size: 100% 100%;
-    background-repeat: no-repeat;
-    transform: scaleX(2);
-    transform-origin: center;
-  }
+  /* qr-layer は画像生成時に歪みを焼き込む方式に変更したため不使用（互換のため残す） */
+  .qr-layer { display: none; }
 
   .face.front {
     display: flex;
@@ -336,6 +322,8 @@
   // QRコード「!」 + ノイズ模様5面を生成して CSS 変数に渡す
   function setupPhase2Visuals() {
     // QR生成（ライブラリ未読込なら飛ばす）
+    // アナモルフィック歪み：水平方向に1/2圧縮した状態で焼き込む
+    // → cubeをY軸まわりに約60°回すと面が画面上で1/2幅に投影され、正方形QRに見える
     if (typeof QRCode !== 'undefined' && QRCode.toDataURL) {
       QRCode.toDataURL('!', {
         errorCorrectionLevel: 'L',
@@ -343,7 +331,19 @@
         width: 480,
         color: { dark: '#f4f1ea', light: '#1a1a1a' }
       }, (err, url) => {
-        if (!err) document.body.style.setProperty('--qr-image', `url(${url})`);
+        if (err) return;
+        const img = new Image();
+        img.onload = () => {
+          const c = document.createElement('canvas');
+          c.width = 480; c.height = 480;
+          const ctx = c.getContext('2d');
+          ctx.fillStyle = '#1a1a1a';
+          ctx.fillRect(0, 0, 480, 480);
+          // 水平方向に1/2圧縮して中央配置
+          ctx.drawImage(img, 120, 0, 240, 480);
+          document.body.style.setProperty('--qr-image', `url(${c.toDataURL()})`);
+        };
+        img.src = url;
       });
     }
     for (let i = 1; i <= 5; i++) {
