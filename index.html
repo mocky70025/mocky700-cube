@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>cube</title>
-<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <style>
   html, body {
     margin: 0;
@@ -321,34 +321,47 @@
 
   // QRコード「!」 + ノイズ模様5面を生成して CSS 変数に渡す
   function setupPhase2Visuals() {
-    // QR生成（ライブラリ未読込なら飛ばす）
+    // QR生成（qrcode-generator API使用）
     // アナモルフィック歪み：水平方向に1/2圧縮した状態で焼き込む
     // → cubeをY軸まわりに約60°回すと面が画面上で1/2幅に投影され、正方形QRに見える
-    if (typeof QRCode !== 'undefined' && QRCode.toDataURL) {
-      QRCode.toDataURL('!', {
-        errorCorrectionLevel: 'L',
-        margin: 2,
-        width: 240,
-        color: { dark: '#f4f1ea', light: '#1a1a1a' }
-      }, (err, url) => {
-        if (err || !url) return;
-        // フォールバック：先に普通のQR画像をセット（圧縮失敗時の保険）
-        document.body.style.setProperty('--qr-image', `url("${url}")`);
-        // canvasで水平1/2圧縮版を作って上書き
-        const img = new Image();
-        img.onload = () => {
-          try {
-            const c = document.createElement('canvas');
-            c.width = 240; c.height = 240;
-            const ctx = c.getContext('2d');
-            ctx.fillStyle = '#1a1a1a';
-            ctx.fillRect(0, 0, 240, 240);
-            ctx.drawImage(img, 60, 0, 120, 240);
-            document.body.style.setProperty('--qr-image', `url("${c.toDataURL()}")`);
-          } catch (e) {}
-        };
-        img.src = url;
-      });
+    if (typeof qrcode === 'function') {
+      try {
+        const qr = qrcode(0, 'L');
+        qr.addData('!');
+        qr.make();
+        const moduleCount = qr.getModuleCount();
+        const cellSize = 8;
+        const margin = 4;
+        const qrPx = (moduleCount + margin * 2) * cellSize;
+
+        // qr.createSvgTagやcreateDataURLでもいいが、自前でcanvas描画する方が色制御できる
+        const qrCanvas = document.createElement('canvas');
+        qrCanvas.width = qrPx;
+        qrCanvas.height = qrPx;
+        const qctx = qrCanvas.getContext('2d');
+        qctx.fillStyle = '#1a1a1a';
+        qctx.fillRect(0, 0, qrPx, qrPx);
+        qctx.fillStyle = '#f4f1ea';
+        for (let r = 0; r < moduleCount; r++) {
+          for (let c = 0; c < moduleCount; c++) {
+            if (qr.isDark(r, c)) {
+              qctx.fillRect((c + margin) * cellSize, (r + margin) * cellSize, cellSize, cellSize);
+            }
+          }
+        }
+
+        // フォールバック：先に通常QR
+        document.body.style.setProperty('--qr-image', `url("${qrCanvas.toDataURL()}")`);
+
+        // 水平1/2圧縮版を作って上書き
+        const distorted = document.createElement('canvas');
+        distorted.width = 240; distorted.height = 240;
+        const dctx = distorted.getContext('2d');
+        dctx.fillStyle = '#1a1a1a';
+        dctx.fillRect(0, 0, 240, 240);
+        dctx.drawImage(qrCanvas, 60, 0, 120, 240);
+        document.body.style.setProperty('--qr-image', `url("${distorted.toDataURL()}")`);
+      } catch (e) {}
     }
     for (let i = 1; i <= 5; i++) {
       const noiseUrl = generateNoiseQRLike(i * 17 + 3);
