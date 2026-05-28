@@ -331,33 +331,16 @@
         const moduleCount = qr.getModuleCount();
         const margin = 4;
 
-        // QR画像（240x240）の中央に「六角形に内接する正方形QR」を配置
-        // 正六角形(外接円半径120)に内接する正方形の辺長 ≈ 120 * √3 / √2 ≈ 147
+        // QR部分のみ描画（背景は透明）。ノイズは各面ごとに別途均一描画する
         const qrCanvas = document.createElement('canvas');
         qrCanvas.width = 240;
         qrCanvas.height = 240;
         const qctx = qrCanvas.getContext('2d');
-        qctx.fillStyle = '#1a1a1a';
-        qctx.fillRect(0, 0, 240, 240);
+        // 背景は透明のまま
         const innerSize = 130;
         const innerOffset = (240 - innerSize) / 2;
         const innerCell = innerSize / (moduleCount + margin * 2);
-
-        // カモフラージュ：他3面と完全に同じパラメータでノイズを描画
-        const noiseSize = 70;
-        const noiseCell = 240 / noiseSize;
-        let seed = 13;
-        const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-        qctx.fillStyle = '#f4f1ea';
-        for (let yi = 0; yi < noiseSize; yi++) {
-          for (let xi = 0; xi < noiseSize; xi++) {
-            if (rand() < 0.5) {
-              qctx.fillRect(xi * noiseCell, yi * noiseCell, noiseCell, noiseCell);
-            }
-          }
-        }
-
-        // QR領域（quiet zone含む）を黒で塗りつぶし → QR本体を描画
+        // QR領域（quiet zone含む）だけ黒で塗りつぶし → QR本体描画
         qctx.fillStyle = '#1a1a1a';
         qctx.fillRect(innerOffset, innerOffset, innerSize, innerSize);
         qctx.fillStyle = '#f4f1ea';
@@ -441,20 +424,36 @@
           ctx.restore();
         }
 
-        function makeFace(s1, d1, s2, d2) {
+        function makeFace(s1, d1, s2, d2, noiseSeed) {
           const c = document.createElement('canvas');
           c.width = 240; c.height = 240;
           const ctx = c.getContext('2d');
+          // 1. 黒で塗りつぶし
           ctx.fillStyle = '#1a1a1a';
           ctx.fillRect(0, 0, 240, 240);
+          // 2. 他3面と同じスタイル/粒度のノイズを直接描画（歪みなし）
+          ctx.fillStyle = '#f4f1ea';
+          const nSize = 70;
+          const nCell = 240 / nSize;
+          let ns = noiseSeed;
+          const nRand = () => { ns = (ns * 9301 + 49297) % 233280; return ns / 233280; };
+          for (let y = 0; y < nSize; y++) {
+            for (let x = 0; x < nSize; x++) {
+              if (nRand() < 0.5) {
+                ctx.fillRect(x * nCell, y * nCell, nCell, nCell);
+              }
+            }
+          }
+          // 3. QR部分（背景透明、QR領域のみ）を affineで歪ませて上書き
           drawTri(ctx, s1, d1);
           drawTri(ctx, s2, d2);
           return c.toDataURL();
         }
 
-        document.body.style.setProperty('--qr-image-top',   `url("${makeFace(srcTop_T1,   dstTop_T1,   srcTop_T2,   dstTop_T2)}")`);
-        document.body.style.setProperty('--qr-image-front', `url("${makeFace(srcFront_T1, dstFront_T1, srcFront_T2, dstFront_T2)}")`);
-        document.body.style.setProperty('--qr-image-right', `url("${makeFace(srcRight_T1, dstRight_T1, srcRight_T2, dstRight_T2)}")`);
+        // 他3面のノイズシードと同じ計算式（i*17+3）に揃え、4,5,6番を割り当て
+        document.body.style.setProperty('--qr-image-top',   `url("${makeFace(srcTop_T1,   dstTop_T1,   srcTop_T2,   dstTop_T2,   4 * 17 + 3)}")`);
+        document.body.style.setProperty('--qr-image-front', `url("${makeFace(srcFront_T1, dstFront_T1, srcFront_T2, dstFront_T2, 5 * 17 + 3)}")`);
+        document.body.style.setProperty('--qr-image-right', `url("${makeFace(srcRight_T1, dstRight_T1, srcRight_T2, dstRight_T2, 6 * 17 + 3)}")`);
       } catch (e) {}
     }
     // ノイズは back/left/bottom 用に3枚
