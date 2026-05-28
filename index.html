@@ -202,6 +202,10 @@
     velY = 0;
   }
 
+  // 直近の動きを追跡して、離した瞬間の慣性を平均化
+  let recentMoves = [];
+  const TRACK_WINDOW = 80; // ms
+
   function onMove(e) {
     if (!dragging) return;
     e.preventDefault();
@@ -209,13 +213,12 @@
     const dx = p.x - lastX;
     const dy = p.y - lastY;
     const now = performance.now();
-    const dt = Math.max(now - lastT, 1);
 
     rotY -= dx * SENSITIVITY;
     rotX += dy * SENSITIVITY;
 
-    velY = -(dx * SENSITIVITY) * (16 / dt);
-    velX = (dy * SENSITIVITY) * (16 / dt);
+    recentMoves.push({ dx, dy, t: now });
+    recentMoves = recentMoves.filter(m => now - m.t < TRACK_WINDOW);
 
     lastX = p.x;
     lastY = p.y;
@@ -226,6 +229,21 @@
   function onUp() {
     dragging = false;
     stage.classList.remove('dragging');
+
+    // 直近 TRACK_WINDOW ms の平均から慣性を算出
+    const now = performance.now();
+    recentMoves = recentMoves.filter(m => now - m.t < TRACK_WINDOW);
+    if (recentMoves.length > 1) {
+      const totalDx = recentMoves.reduce((s, m) => s + m.dx, 0);
+      const totalDy = recentMoves.reduce((s, m) => s + m.dy, 0);
+      const duration = Math.max(now - recentMoves[0].t, 16);
+      velY = -(totalDx * SENSITIVITY) * (16 / duration);
+      velX = (totalDy * SENSITIVITY) * (16 / duration);
+    } else {
+      velX = 0;
+      velY = 0;
+    }
+    recentMoves = [];
   }
 
   stage.addEventListener('mousedown', onDown);
@@ -315,14 +333,7 @@
     location.replace(BANISH_URL);
   }
 
-  // A. resize差分検知（dockedなDevTools）
-  function checkResize() {
-    const wDiff = window.outerWidth  - window.innerWidth;
-    const hDiff = window.outerHeight - window.innerHeight;
-    if (wDiff > 200 || hDiff > 200) banish();
-  }
-  setInterval(checkResize, 800);
-  window.addEventListener('resize', checkResize);
+  // A. resize差分検知は誤検知が多すぎる（全画面解除・タブバー再表示等）ため削除
 
   // B. debugger trip（DevTools開時にpauseで時間差が出る）
   function checkDebugger() {
@@ -343,8 +354,6 @@
     console.clear();
   }, 1500);
 
-  // 初回チェック
-  checkResize();
   } // end of DevTools detection guard
 </script>
 </body>
