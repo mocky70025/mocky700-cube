@@ -245,8 +245,7 @@
     const dy = p.y - lastY;
     const now = performance.now();
 
-    // リバース指定：dx→Y軸まわり負方向、dy→X軸まわり正方向
-    applyAngularDelta(-dx * SENSITIVITY, dy * SENSITIVITY);
+    applyAngularDelta(dx * SENSITIVITY, -dy * SENSITIVITY);
 
     recentMoves.push({ dx, dy, t: now });
     recentMoves = recentMoves.filter(m => now - m.t < TRACK_WINDOW);
@@ -268,8 +267,8 @@
       const totalDx = recentMoves.reduce((s, m) => s + m.dx, 0);
       const totalDy = recentMoves.reduce((s, m) => s + m.dy, 0);
       const duration = Math.max(now - recentMoves[0].t, 16);
-      velY = -(totalDx * SENSITIVITY) * (16 / duration);
-      velX = (totalDy * SENSITIVITY) * (16 / duration);
+      velY = (totalDx * SENSITIVITY) * (16 / duration);
+      velX = -(totalDy * SENSITIVITY) * (16 / duration);
     } else {
       velX = 0;
       velY = 0;
