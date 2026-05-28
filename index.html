@@ -153,10 +153,35 @@
   const stage = document.getElementById('stage');
   const cube  = document.getElementById('cube');
 
-  let rotX = -20;
-  let rotY = -30;
-  let velX = 0;
-  let velY = 0;
+  // --- 4x4 回転行列ユーティリティ（column-major）---
+  const DEG = Math.PI / 180;
+  function identityMat() {
+    return [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+  }
+  function multiplyMat(a, b) {
+    const r = new Array(16);
+    for (let col = 0; col < 4; col++) {
+      for (let row = 0; row < 4; row++) {
+        let s = 0;
+        for (let k = 0; k < 4; k++) s += a[row + k * 4] * b[k + col * 4];
+        r[row + col * 4] = s;
+      }
+    }
+    return r;
+  }
+  function rotXMat(rad) {
+    const c = Math.cos(rad), s = Math.sin(rad);
+    return [1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,0,0,1];
+  }
+  function rotYMat(rad) {
+    const c = Math.cos(rad), s = Math.sin(rad);
+    return [c,0,-s,0, 0,1,0,0, s,0,c,0, 0,0,0,1];
+  }
+
+  // 初期姿勢（rotX=-20, rotY=-30 を合成）
+  let R = multiplyMat(rotXMat(-20 * DEG), rotYMat(-30 * DEG));
+  let velX = 0;  // X軸まわり角速度（度/フレーム、ピッチ）
+  let velY = 0;  // Y軸まわり角速度（度/フレーム、ヨー）
 
   let dragging = false;
   let lastX = 0;
@@ -168,14 +193,20 @@
   const MIN_VEL = 0.01;
 
   function render() {
-    cube.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+    cube.style.transform = `matrix3d(${R.join(',')})`;
+  }
+
+  // ワールド軸での回転を pre-multiply（cube の姿勢に依らず画面と整合）
+  function applyAngularDelta(yawDeg, pitchDeg) {
+    const Ry = rotYMat(yawDeg * DEG);
+    const Rx = rotXMat(pitchDeg * DEG);
+    R = multiplyMat(multiplyMat(Rx, Ry), R);
   }
 
   function tick() {
     if (!dragging) {
       if (Math.abs(velX) > MIN_VEL || Math.abs(velY) > MIN_VEL) {
-        rotX += velX;
-        rotY += velY;
+        applyAngularDelta(velY, velX);
         velX *= FRICTION;
         velY *= FRICTION;
         render();
@@ -214,8 +245,8 @@
     const dy = p.y - lastY;
     const now = performance.now();
 
-    rotY -= dx * SENSITIVITY;
-    rotX += dy * SENSITIVITY;
+    // リバース指定：dx→Y軸まわり負方向、dy→X軸まわり正方向
+    applyAngularDelta(-dx * SENSITIVITY, dy * SENSITIVITY);
 
     recentMoves.push({ dx, dy, t: now });
     recentMoves = recentMoves.filter(m => now - m.t < TRACK_WINDOW);
