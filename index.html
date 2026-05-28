@@ -371,12 +371,14 @@
         }
 
         // 三角形マスク（240x240 canvas内の3頂点）
-        // top面：面のローカル下辺中点(120,240)が手前頂点。下半分の三角形を使用
-        const topTri    = [[0,240],   [240,240], [120,0]];
-        // front面：面のローカル右上(240,0)が手前頂点。左下方向に伸びる三角形
-        const frontTri  = [[240,0],   [240,240], [0,120]];
-        // right面：面のローカル左上(0,0)が手前頂点。右下方向に伸びる三角形
-        const rightTri  = [[0,0],     [0,240],   [240,120]];
+        // 各面の transform から計算した「手前頂点 (1,0,1) のローカル座標」を頂点とする
+        // 三角形は「手前頂点 + 隣接2頂点」で構成 → 頂点ビューで中央会合
+        // face.top の手前頂点 = (240, 240)
+        const topTri    = [[240,240], [240,0],   [0,240]];
+        // face.front の手前頂点 = (240, 0)
+        const frontTri  = [[240,0],   [0,0],     [240,240]];
+        // face.right の手前頂点 = (0, 0)
+        const rightTri  = [[0,0],     [240,0],   [0,240]];
 
         document.body.style.setProperty('--qr-image-top',   `url("${makeFaceSlice(topTri)}")`);
         document.body.style.setProperty('--qr-image-front', `url("${makeFaceSlice(frontTri)}")`);
