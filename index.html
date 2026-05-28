@@ -370,17 +370,20 @@
         // 各菱形を「O+隣接2頂点」の2三角形に分割
         // src頂点順序を dst と反対の巻き方向にして鏡映を防ぐ
         // top面（画面上方向の菱形）: O,V4,V5,V0
-        // top面（画面上方向の菱形）: O + V5(左上) + V0(上) + V1(右上)
-        const srcTop_T1 = [O, hexV(0), hexV(5)];
-        const srcTop_T2 = [O, hexV(1), hexV(0)];
+        // top面（画面上方向の菱形）
+        // dst T1=[(240,240),(240,0),(0,0)]↔[O,V1,V0], T2=[(240,240),(0,0),(0,240)]↔[O,V0,V5]
+        const srcTop_T1 = [O, hexV(1), hexV(0)];
+        const srcTop_T2 = [O, hexV(0), hexV(5)];
         // front面（画面左下方向の菱形）: O,V2,V3,V4
-        // front面（画面左下方向の菱形）: O + V3(下) + V4(左下) + V5(左上)
-        const srcFront_T1 = [O, hexV(4), hexV(3)];
-        const srcFront_T2 = [O, hexV(5), hexV(4)];
+        // front面（画面左下方向の菱形）
+        // dst T1=[(240,0),(0,0),(0,240)]↔[O,V5,V4], T2=[(240,0),(0,240),(240,240)]↔[O,V4,V3]
+        const srcFront_T1 = [O, hexV(5), hexV(4)];
+        const srcFront_T2 = [O, hexV(4), hexV(3)];
         // right面（画面右下方向の菱形）: O,V0,V1,V2
-        // right面（画面右下方向の菱形）: O + V1(右上) + V2(右下) + V3(下)
-        const srcRight_T1 = [O, hexV(2), hexV(1)];
-        const srcRight_T2 = [O, hexV(3), hexV(2)];
+        // right面（画面右下方向の菱形）
+        // dst T1=[(0,0),(240,0),(240,240)]↔[O,V1,V2], T2=[(0,0),(240,240),(0,240)]↔[O,V2,V3]
+        const srcRight_T1 = [O, hexV(1), hexV(2)];
+        const srcRight_T2 = [O, hexV(2), hexV(3)];
 
         // 各面のローカル4頂点を2三角形に分割（手前頂点と対角頂点を結ぶ対角線で分ける）
         // face.top: 手前(240,240)、対角(0,0)
