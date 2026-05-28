@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/cube/:rest*", "destination": "/cube/index.html" }
+    { "source": "/:rest*", "destination": "/index.html" }
   ]
 }

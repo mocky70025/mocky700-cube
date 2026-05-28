@@ -240,9 +240,9 @@
   tick();
 
   // --- URL書き換えメカニクス ---
-  // /cube/      → 1ページ目
-  // /cube/:     → /cube/:/ にリダイレクト
-  // /cube/:/    → 2ページ目（高速回転 → QR cube）
+  // /      → 1ページ目
+  // /:     → /:/ にリダイレクト
+  // /:/    → 2ページ目（高速回転 → QR cube）
   const DEV_PHASE2 = location.search.includes('dev=phase2');
   (function handleRoute() {
     if (DEV_PHASE2) { startPhase2(); return; }
