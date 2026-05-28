@@ -325,23 +325,27 @@
   function startPhase2() {
     velX = 14;
     velY = 38;
-    setupPhase2Visuals();
+    // CSS切替は何があっても確実に発火させる
     setTimeout(() => {
       document.body.classList.add('phase2');
     }, 1800);
+    // 画像生成は失敗しても続行（QRCodeライブラリ未読込等の保険）
+    try { setupPhase2Visuals(); } catch (e) {}
   }
 
   // QRコード「!」 + ノイズ模様5面を生成して CSS 変数に渡す
   function setupPhase2Visuals() {
-    QRCode.toDataURL('!', {
-      errorCorrectionLevel: 'L',
-      margin: 2,
-      width: 480,
-      color: { dark: '#f4f1ea', light: '#1a1a1a' }
-    }, (err, url) => {
-      if (!err) document.body.style.setProperty('--qr-image', `url(${url})`);
-    });
-
+    // QR生成（ライブラリ未読込なら飛ばす）
+    if (typeof QRCode !== 'undefined' && QRCode.toDataURL) {
+      QRCode.toDataURL('!', {
+        errorCorrectionLevel: 'L',
+        margin: 2,
+        width: 480,
+        color: { dark: '#f4f1ea', light: '#1a1a1a' }
+      }, (err, url) => {
+        if (!err) document.body.style.setProperty('--qr-image', `url(${url})`);
+      });
+    }
     for (let i = 1; i <= 5; i++) {
       const noiseUrl = generateNoiseQRLike(i * 17 + 3);
       document.body.style.setProperty(`--noise-image-${i}`, `url(${noiseUrl})`);
