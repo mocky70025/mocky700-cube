@@ -73,12 +73,29 @@
     box-shadow: none;
     padding: 0;
   }
-  body.phase2 .face.front  { background-image: var(--qr-image); }
+  body.phase2 .face.front  { background-image: none; }
   body.phase2 .face.back   { background-image: var(--noise-image-1); }
   body.phase2 .face.right  { background-image: var(--noise-image-2); }
   body.phase2 .face.left   { background-image: var(--noise-image-3); }
   body.phase2 .face.top    { background-image: var(--noise-image-4); }
   body.phase2 .face.bottom { background-image: var(--noise-image-5); }
+
+  /* アナモルフィック歪みレイヤー：scaleX(2)で水平方向に伸ばす
+     → cubeをY軸まわりに約60度回すと画面上で正方形に見える */
+  .qr-layer {
+    display: none;
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  body.phase2 .face.front .qr-layer {
+    display: block;
+    background-image: var(--qr-image);
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    transform: scaleX(2);
+    transform-origin: center;
+  }
 
   .face.front {
     display: flex;
@@ -119,6 +136,7 @@
       </div>
       <div class="face front">
         <span class="question">?</span>
+        <div class="qr-layer"></div>
       </div>
       <div class="face right">
         <span class="pip p1"></span>
