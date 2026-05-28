@@ -322,57 +322,72 @@
 
   // QRコード「!」 + ノイズ模様5面を生成して CSS 変数に渡す
   function setupPhase2Visuals() {
-    // QR生成（Step 3: 3つの菱形セクターに分割 + 各面に逆affine変換）
+    // QR生成（Step 3 改: 六角形に内接するQR、各面全体を菱形セクターに2三角形でマップ）
     if (typeof qrcode === 'function') {
       try {
         const qr = qrcode(0, 'L');
         qr.addData('!');
         qr.make();
         const moduleCount = qr.getModuleCount();
-        const cellSize = 8;
         const margin = 4;
-        const qrPx = (moduleCount + margin * 2) * cellSize;
 
-        // 元のQR画像（240x240にスケール想定）
+        // QR画像（240x240）の中央に「六角形に内接する正方形QR」を配置
+        // 正六角形(外接円半径120)に内接する正方形の辺長 ≈ 120 * √3 / √2 ≈ 147
         const qrCanvas = document.createElement('canvas');
         qrCanvas.width = 240;
         qrCanvas.height = 240;
         const qctx = qrCanvas.getContext('2d');
         qctx.fillStyle = '#1a1a1a';
         qctx.fillRect(0, 0, 240, 240);
+        const innerSize = 147;
+        const innerOffset = (240 - innerSize) / 2;
+        const innerCell = innerSize / (moduleCount + margin * 2);
         qctx.fillStyle = '#f4f1ea';
-        const scaledCell = 240 / (moduleCount + margin * 2);
         for (let r = 0; r < moduleCount; r++) {
           for (let c = 0; c < moduleCount; c++) {
             if (qr.isDark(r, c)) {
-              qctx.fillRect((c + margin) * scaledCell, (r + margin) * scaledCell, scaledCell, scaledCell);
+              qctx.fillRect(
+                innerOffset + (c + margin) * innerCell,
+                innerOffset + (r + margin) * innerCell,
+                innerCell, innerCell
+              );
             }
           }
         }
 
-        // QR画像内の正六角形頂点（中心 O=(120,120)、外接円半径 120）
+        // 正六角形頂点（中心O=(120,120)、外接円半径120）
         const O = [120, 120];
         const R = 120;
         const hexV = k => [
           O[0] + R * Math.cos(k * Math.PI / 3),
           O[1] + R * Math.sin(k * Math.PI / 3)
         ];
-        // k=0: (240,120)右, k=1:(180,224)右下, k=2:(60,224)左下,
+        // k=0:(240,120)右, k=1:(180,224)右下, k=2:(60,224)左下,
         // k=3:(0,120)左, k=4:(60,16)左上, k=5:(180,16)右上
 
-        // 3菱形セクターの「中心側三角形」: O + 120°離れた2頂点
-        // 各面に対応：top=上方向, front=左下方向, right=右下方向
-        const srcTri_top   = [O, hexV(4), hexV(0)]; // 左上↔右の三角形（上向き菱形）
-        const srcTri_front = [O, hexV(2), hexV(4)]; // 左下↔左上（左下方向）
-        const srcTri_right = [O, hexV(0), hexV(2)]; // 右↔左下（右下方向）
+        // 各面に対応する菱形セクター（QR画像内、O + 4頂点）
+        // 各菱形を「O+隣接2頂点」の2三角形に分割
+        // top面（画面上方向の菱形）: O,V4,V5,V0
+        const srcTop_T1 = [O, hexV(4), hexV(5)];
+        const srcTop_T2 = [O, hexV(5), hexV(0)];
+        // front面（画面左下方向の菱形）: O,V2,V3,V4
+        const srcFront_T1 = [O, hexV(2), hexV(3)];
+        const srcFront_T2 = [O, hexV(3), hexV(4)];
+        // right面（画面右下方向の菱形）: O,V0,V1,V2
+        const srcRight_T1 = [O, hexV(0), hexV(1)];
+        const srcRight_T2 = [O, hexV(1), hexV(2)];
 
-        // 各面のローカル三角形（手前頂点 + 隣接2頂点）
-        const dstTri_top   = [[240,240], [240,0],   [0,240]];
-        const dstTri_front = [[240,0],   [0,0],     [240,240]];
-        const dstTri_right = [[0,0],     [240,0],   [0,240]];
+        // 各面のローカル4頂点を2三角形に分割（手前頂点と対角頂点を結ぶ対角線で分ける）
+        // face.top: 手前(240,240)、対角(0,0)
+        const dstTop_T1 = [[240,240], [240,0], [0,0]];
+        const dstTop_T2 = [[240,240], [0,0],   [0,240]];
+        // face.front: 手前(240,0)、対角(0,240)
+        const dstFront_T1 = [[240,0], [0,0],   [0,240]];
+        const dstFront_T2 = [[240,0], [0,240], [240,240]];
+        // face.right: 手前(0,0)、対角(240,240)
+        const dstRight_T1 = [[0,0], [240,0],   [240,240]];
+        const dstRight_T2 = [[0,0], [240,240], [0,240]];
 
-        // 3頂点ペアから affine 行列 (a,b,c,d,e,f) を求める
-        // x' = a*x + c*y + e, y' = b*x + d*y + f
         function getAffineMatrix(src, dst) {
           const [s0, s1, s2] = src;
           const [d0, d1, d2] = dst;
@@ -386,13 +401,7 @@
           return [a, b, c, d, e, f];
         }
 
-        // src画像のsrcTri領域を、dstCanvasのdstTri領域に変換して描画
-        function makeFaceSlice(srcTri, dstTri) {
-          const c = document.createElement('canvas');
-          c.width = 240; c.height = 240;
-          const ctx = c.getContext('2d');
-          ctx.fillStyle = '#1a1a1a';
-          ctx.fillRect(0, 0, 240, 240);
+        function drawTri(ctx, srcTri, dstTri) {
           const m = getAffineMatrix(srcTri, dstTri);
           ctx.save();
           ctx.beginPath();
@@ -404,12 +413,22 @@
           ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
           ctx.drawImage(qrCanvas, 0, 0);
           ctx.restore();
+        }
+
+        function makeFace(s1, d1, s2, d2) {
+          const c = document.createElement('canvas');
+          c.width = 240; c.height = 240;
+          const ctx = c.getContext('2d');
+          ctx.fillStyle = '#1a1a1a';
+          ctx.fillRect(0, 0, 240, 240);
+          drawTri(ctx, s1, d1);
+          drawTri(ctx, s2, d2);
           return c.toDataURL();
         }
 
-        document.body.style.setProperty('--qr-image-top',   `url("${makeFaceSlice(srcTri_top,   dstTri_top)}")`);
-        document.body.style.setProperty('--qr-image-front', `url("${makeFaceSlice(srcTri_front, dstTri_front)}")`);
-        document.body.style.setProperty('--qr-image-right', `url("${makeFaceSlice(srcTri_right, dstTri_right)}")`);
+        document.body.style.setProperty('--qr-image-top',   `url("${makeFace(srcTop_T1,   dstTop_T1,   srcTop_T2,   dstTop_T2)}")`);
+        document.body.style.setProperty('--qr-image-front', `url("${makeFace(srcFront_T1, dstFront_T1, srcFront_T2, dstFront_T2)}")`);
+        document.body.style.setProperty('--qr-image-right', `url("${makeFace(srcRight_T1, dstRight_T1, srcRight_T2, dstRight_T2)}")`);
       } catch (e) {}
     }
     // ノイズは back/left/bottom 用に3枚
