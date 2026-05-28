@@ -73,12 +73,13 @@
     box-shadow: none;
     padding: 0;
   }
+  /* 頂点ビューで連結する3面（front/right/top）にQR、残り3面はノイズ */
   body.phase2 .face.front  { background-image: var(--qr-image); }
+  body.phase2 .face.right  { background-image: var(--qr-image); }
+  body.phase2 .face.top    { background-image: var(--qr-image); }
   body.phase2 .face.back   { background-image: var(--noise-image-1); }
-  body.phase2 .face.right  { background-image: var(--noise-image-2); }
-  body.phase2 .face.left   { background-image: var(--noise-image-3); }
-  body.phase2 .face.top    { background-image: var(--noise-image-4); }
-  body.phase2 .face.bottom { background-image: var(--noise-image-5); }
+  body.phase2 .face.left   { background-image: var(--noise-image-2); }
+  body.phase2 .face.bottom { background-image: var(--noise-image-3); }
 
   /* qr-layer は画像生成時に歪みを焼き込む方式に変更したため不使用（互換のため残す） */
   .qr-layer { display: none; }
@@ -321,10 +322,7 @@
 
   // QRコード「!」 + ノイズ模様5面を生成して CSS 変数に渡す
   function setupPhase2Visuals() {
-    // QR生成（qrcode-generator API使用）
-    // アナモルフィック歪み：水平方向に2倍に拡張した状態で焼き込む（横長QR）
-    // → cubeをY軸まわりに約60°回すと面が画面上で1/2幅に投影され、正方形QRに見える
-    // 加えて、QR以外の領域は他5面と同じノイズで塗り、QRの境界を隠す
+    // QR生成（Step 1: 素のQRを3面に貼る。Step 2-3で分割・逆歪みに発展）
     if (typeof qrcode === 'function') {
       try {
         const qr = qrcode(0, 'L');
@@ -335,11 +333,12 @@
         const margin = 4;
         const qrPx = (moduleCount + margin * 2) * cellSize;
 
-        // QR画像：透明背景＋白モジュールのみ（ノイズの上に重ねるため）
         const qrCanvas = document.createElement('canvas');
         qrCanvas.width = qrPx;
         qrCanvas.height = qrPx;
         const qctx = qrCanvas.getContext('2d');
+        qctx.fillStyle = '#1a1a1a';
+        qctx.fillRect(0, 0, qrPx, qrPx);
         qctx.fillStyle = '#f4f1ea';
         for (let r = 0; r < moduleCount; r++) {
           for (let c = 0; c < moduleCount; c++) {
@@ -348,32 +347,11 @@
             }
           }
         }
-
-        // front面：他5面と同じノイズで全面塗ってから、横長QRを中央に重ねる
-        const distorted = document.createElement('canvas');
-        distorted.width = 240; distorted.height = 240;
-        const dctx = distorted.getContext('2d');
-        dctx.fillStyle = '#1a1a1a';
-        dctx.fillRect(0, 0, 240, 240);
-        dctx.fillStyle = '#f4f1ea';
-        let seed = 41;
-        const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-        const nSize = 21;
-        const nCell = 240 / nSize;
-        for (let y = 0; y < nSize; y++) {
-          for (let x = 0; x < nSize; x++) {
-            if (rand() < 0.5) dctx.fillRect(x * nCell, y * nCell, nCell, nCell);
-          }
-        }
-
-        // QR画像を水平に2倍拡張（高さ120 = 縦方向に1/2圧縮）して中央に重ねる
-        // → Y軸60°回転時に画面上で正方形QRに見える
-        dctx.drawImage(qrCanvas, 0, 60, 240, 120);
-
-        document.body.style.setProperty('--qr-image', `url("${distorted.toDataURL()}")`);
+        document.body.style.setProperty('--qr-image', `url("${qrCanvas.toDataURL()}")`);
       } catch (e) {}
     }
-    for (let i = 1; i <= 5; i++) {
+    // ノイズは back/left/bottom 用に3枚
+    for (let i = 1; i <= 3; i++) {
       const noiseUrl = generateNoiseQRLike(i * 17 + 3);
       document.body.style.setProperty(`--noise-image-${i}`, `url(${noiseUrl})`);
     }
