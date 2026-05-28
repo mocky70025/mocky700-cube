@@ -331,28 +331,24 @@
         const moduleCount = qr.getModuleCount();
         const margin = 4;
 
-        // QR部分のみ描画（背景は透明）。ノイズは各面ごとに別途均一描画する
+        // QR本体（21x21モジュール）のみ描画、quiet zoneも背景も透明
+        // → 各面ではノイズが透けて、QR本体だけがノイズに埋め込まれた状態に
         const qrCanvas = document.createElement('canvas');
         qrCanvas.width = 240;
         qrCanvas.height = 240;
         const qctx = qrCanvas.getContext('2d');
-        // 背景は透明のまま
         const innerSize = 130;
         const innerOffset = (240 - innerSize) / 2;
         const innerCell = innerSize / (moduleCount + margin * 2);
-        // QR領域（quiet zone含む）だけ黒で塗りつぶし → QR本体描画
-        qctx.fillStyle = '#1a1a1a';
-        qctx.fillRect(innerOffset, innerOffset, innerSize, innerSize);
-        qctx.fillStyle = '#f4f1ea';
+        const qrBodyOffset = innerOffset + margin * innerCell;
         for (let r = 0; r < moduleCount; r++) {
           for (let c = 0; c < moduleCount; c++) {
-            if (qr.isDark(r, c)) {
-              qctx.fillRect(
-                innerOffset + (c + margin) * innerCell,
-                innerOffset + (r + margin) * innerCell,
-                innerCell, innerCell
-              );
-            }
+            qctx.fillStyle = qr.isDark(r, c) ? '#f4f1ea' : '#1a1a1a';
+            qctx.fillRect(
+              qrBodyOffset + c * innerCell,
+              qrBodyOffset + r * innerCell,
+              innerCell, innerCell
+            );
           }
         }
 
