@@ -322,7 +322,7 @@
 
   // QRコード「!」 + ノイズ模様5面を生成して CSS 変数に渡す
   function setupPhase2Visuals() {
-    // QR生成（Step 2: 3つの三角形に分割して3面に配置。Step 3で逆歪み追加予定）
+    // QR生成（Step 3: 3つの菱形セクターに分割 + 各面に逆affine変換）
     if (typeof qrcode === 'function') {
       try {
         const qr = qrcode(0, 'L');
@@ -333,56 +333,83 @@
         const margin = 4;
         const qrPx = (moduleCount + margin * 2) * cellSize;
 
-        // 元のQR画像
+        // 元のQR画像（240x240にスケール想定）
         const qrCanvas = document.createElement('canvas');
-        qrCanvas.width = qrPx;
-        qrCanvas.height = qrPx;
+        qrCanvas.width = 240;
+        qrCanvas.height = 240;
         const qctx = qrCanvas.getContext('2d');
         qctx.fillStyle = '#1a1a1a';
-        qctx.fillRect(0, 0, qrPx, qrPx);
+        qctx.fillRect(0, 0, 240, 240);
         qctx.fillStyle = '#f4f1ea';
+        const scaledCell = 240 / (moduleCount + margin * 2);
         for (let r = 0; r < moduleCount; r++) {
           for (let c = 0; c < moduleCount; c++) {
             if (qr.isDark(r, c)) {
-              qctx.fillRect((c + margin) * cellSize, (r + margin) * cellSize, cellSize, cellSize);
+              qctx.fillRect((c + margin) * scaledCell, (r + margin) * scaledCell, scaledCell, scaledCell);
             }
           }
         }
 
-        // 各面用に三角形マスクで切り抜いたcanvasを生成
-        // 240x240 canvas の中で、中心(120,120)から3方向の三角形マスク
-        // 頂点ビューで3面の三角形が中央で会合する想定
-        function makeFaceSlice(triangle) {
+        // QR画像内の正六角形頂点（中心 O=(120,120)、外接円半径 120）
+        const O = [120, 120];
+        const R = 120;
+        const hexV = k => [
+          O[0] + R * Math.cos(k * Math.PI / 3),
+          O[1] + R * Math.sin(k * Math.PI / 3)
+        ];
+        // k=0: (240,120)右, k=1:(180,224)右下, k=2:(60,224)左下,
+        // k=3:(0,120)左, k=4:(60,16)左上, k=5:(180,16)右上
+
+        // 3菱形セクターの「中心側三角形」: O + 120°離れた2頂点
+        // 各面に対応：top=上方向, front=左下方向, right=右下方向
+        const srcTri_top   = [O, hexV(4), hexV(0)]; // 左上↔右の三角形（上向き菱形）
+        const srcTri_front = [O, hexV(2), hexV(4)]; // 左下↔左上（左下方向）
+        const srcTri_right = [O, hexV(0), hexV(2)]; // 右↔左下（右下方向）
+
+        // 各面のローカル三角形（手前頂点 + 隣接2頂点）
+        const dstTri_top   = [[240,240], [240,0],   [0,240]];
+        const dstTri_front = [[240,0],   [0,0],     [240,240]];
+        const dstTri_right = [[0,0],     [240,0],   [0,240]];
+
+        // 3頂点ペアから affine 行列 (a,b,c,d,e,f) を求める
+        // x' = a*x + c*y + e, y' = b*x + d*y + f
+        function getAffineMatrix(src, dst) {
+          const [s0, s1, s2] = src;
+          const [d0, d1, d2] = dst;
+          const det = s0[0]*(s1[1]-s2[1]) - s0[1]*(s1[0]-s2[0]) + (s1[0]*s2[1] - s2[0]*s1[1]);
+          const a = (d0[0]*(s1[1]-s2[1]) - s0[1]*(d1[0]-d2[0]) + (d1[0]*s2[1] - d2[0]*s1[1])) / det;
+          const c = (s0[0]*(d1[0]-d2[0]) - d0[0]*(s1[0]-s2[0]) + (s1[0]*d2[0] - s2[0]*d1[0])) / det;
+          const e = (s0[0]*(s1[1]*d2[0] - s2[1]*d1[0]) - s0[1]*(s1[0]*d2[0] - s2[0]*d1[0]) + d0[0]*(s1[0]*s2[1] - s2[0]*s1[1])) / det;
+          const b = (d0[1]*(s1[1]-s2[1]) - s0[1]*(d1[1]-d2[1]) + (d1[1]*s2[1] - d2[1]*s1[1])) / det;
+          const d = (s0[0]*(d1[1]-d2[1]) - d0[1]*(s1[0]-s2[0]) + (s1[0]*d2[1] - s2[0]*d1[1])) / det;
+          const f = (s0[0]*(s1[1]*d2[1] - s2[1]*d1[1]) - s0[1]*(s1[0]*d2[1] - s2[0]*d1[1]) + d0[1]*(s1[0]*s2[1] - s2[0]*s1[1])) / det;
+          return [a, b, c, d, e, f];
+        }
+
+        // src画像のsrcTri領域を、dstCanvasのdstTri領域に変換して描画
+        function makeFaceSlice(srcTri, dstTri) {
           const c = document.createElement('canvas');
           c.width = 240; c.height = 240;
           const ctx = c.getContext('2d');
           ctx.fillStyle = '#1a1a1a';
           ctx.fillRect(0, 0, 240, 240);
+          const m = getAffineMatrix(srcTri, dstTri);
           ctx.save();
           ctx.beginPath();
-          ctx.moveTo(triangle[0][0], triangle[0][1]);
-          ctx.lineTo(triangle[1][0], triangle[1][1]);
-          ctx.lineTo(triangle[2][0], triangle[2][1]);
+          ctx.moveTo(dstTri[0][0], dstTri[0][1]);
+          ctx.lineTo(dstTri[1][0], dstTri[1][1]);
+          ctx.lineTo(dstTri[2][0], dstTri[2][1]);
           ctx.closePath();
           ctx.clip();
-          ctx.drawImage(qrCanvas, 0, 0, 240, 240);
+          ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
+          ctx.drawImage(qrCanvas, 0, 0);
           ctx.restore();
           return c.toDataURL();
         }
 
-        // 三角形マスク（240x240 canvas内の3頂点）
-        // 各面の transform から計算した「手前頂点 (1,0,1) のローカル座標」を頂点とする
-        // 三角形は「手前頂点 + 隣接2頂点」で構成 → 頂点ビューで中央会合
-        // face.top の手前頂点 = (240, 240)
-        const topTri    = [[240,240], [240,0],   [0,240]];
-        // face.front の手前頂点 = (240, 0)
-        const frontTri  = [[240,0],   [0,0],     [240,240]];
-        // face.right の手前頂点 = (0, 0)
-        const rightTri  = [[0,0],     [240,0],   [0,240]];
-
-        document.body.style.setProperty('--qr-image-top',   `url("${makeFaceSlice(topTri)}")`);
-        document.body.style.setProperty('--qr-image-front', `url("${makeFaceSlice(frontTri)}")`);
-        document.body.style.setProperty('--qr-image-right', `url("${makeFaceSlice(rightTri)}")`);
+        document.body.style.setProperty('--qr-image-top',   `url("${makeFaceSlice(srcTri_top,   dstTri_top)}")`);
+        document.body.style.setProperty('--qr-image-front', `url("${makeFaceSlice(srcTri_front, dstTri_front)}")`);
+        document.body.style.setProperty('--qr-image-right', `url("${makeFaceSlice(srcTri_right, dstTri_right)}")`);
       } catch (e) {}
     }
     // ノイズは back/left/bottom 用に3枚
