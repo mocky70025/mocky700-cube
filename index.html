@@ -328,20 +328,24 @@
       QRCode.toDataURL('!', {
         errorCorrectionLevel: 'L',
         margin: 2,
-        width: 480,
+        width: 240,
         color: { dark: '#f4f1ea', light: '#1a1a1a' }
       }, (err, url) => {
-        if (err) return;
+        if (err || !url) return;
+        // フォールバック：先に普通のQR画像をセット（圧縮失敗時の保険）
+        document.body.style.setProperty('--qr-image', `url("${url}")`);
+        // canvasで水平1/2圧縮版を作って上書き
         const img = new Image();
         img.onload = () => {
-          const c = document.createElement('canvas');
-          c.width = 480; c.height = 480;
-          const ctx = c.getContext('2d');
-          ctx.fillStyle = '#1a1a1a';
-          ctx.fillRect(0, 0, 480, 480);
-          // 水平方向に1/2圧縮して中央配置
-          ctx.drawImage(img, 120, 0, 240, 480);
-          document.body.style.setProperty('--qr-image', `url(${c.toDataURL()})`);
+          try {
+            const c = document.createElement('canvas');
+            c.width = 240; c.height = 240;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, 240, 240);
+            ctx.drawImage(img, 60, 0, 120, 240);
+            document.body.style.setProperty('--qr-image', `url("${c.toDataURL()}")`);
+          } catch (e) {}
         };
         img.src = url;
       });
