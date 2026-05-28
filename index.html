@@ -343,38 +343,31 @@
         const innerOffset = (240 - innerSize) / 2;
         const innerCell = innerSize / (moduleCount + margin * 2);
 
-        // カモフラージュ：QR領域の外側（六角形内）に同じセルサイズのノイズを敷く
-        // 各面に貼られたとき、面の対角頂点側にこのノイズが投影され、他3面のノイズと馴染む
+        // カモフラージュ：全画像にノイズを敷き詰める
         let seed = 13;
         const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
         const totalCells = Math.ceil(240 / innerCell);
         qctx.fillStyle = '#f4f1ea';
         for (let yi = 0; yi < totalCells; yi++) {
           for (let xi = 0; xi < totalCells; xi++) {
-            const x = xi * innerCell;
-            const y = yi * innerCell;
-            // QR本体領域はスキップ（後で上書き）
-            if (x >= innerOffset && x < innerOffset + innerSize &&
-                y >= innerOffset && y < innerOffset + innerSize) {
-              rand();
-              continue;
-            }
             if (rand() < 0.5) {
-              qctx.fillRect(x, y, innerCell, innerCell);
+              qctx.fillRect(xi * innerCell, yi * innerCell, innerCell, innerCell);
             }
           }
         }
 
-        // 中央にQRを描画（ノイズの上に重ねる）
+        // QR本体だけ黒で塗りつぶし（quiet zone はノイズに残す）
+        const qrBodySize = moduleCount * innerCell;
+        const qrBodyOffset = innerOffset + margin * innerCell;
         qctx.fillStyle = '#1a1a1a';
-        qctx.fillRect(innerOffset, innerOffset, innerSize, innerSize);
+        qctx.fillRect(qrBodyOffset, qrBodyOffset, qrBodySize, qrBodySize);
         qctx.fillStyle = '#f4f1ea';
         for (let r = 0; r < moduleCount; r++) {
           for (let c = 0; c < moduleCount; c++) {
             if (qr.isDark(r, c)) {
               qctx.fillRect(
-                innerOffset + (c + margin) * innerCell,
-                innerOffset + (r + margin) * innerCell,
+                qrBodyOffset + c * innerCell,
+                qrBodyOffset + r * innerCell,
                 innerCell, innerCell
               );
             }
